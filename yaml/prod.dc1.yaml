@@ -1,0 +1,13 @@
+:silo_name: dc1-prod
+:silo: prod.dc1
+:stpstart: 200
+:stpfin: 299
+:prefix: 10.16.
+:vlans:
+   dc1-prod-admin: 210    
+   dc1-prod-data: 223    
+   dc1-prod-service: 212    
+   dc1-prod-vmmgmt: 242    
+   dc1-prod-web: 221  
+:vlans_oob:
+   dc1-prod-oob: 216
