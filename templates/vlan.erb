@@ -1,0 +1,6 @@
+<% siloinfo[:vlans].each do |key,value| -%>
+set vlans <%= key %> vlan-id <%= value %>
+<% if key.include?('inband') then -%>
+set vlans <%= key %> l3-interface vlan.<%= value %>
+<% end -%>
+<% end -%>

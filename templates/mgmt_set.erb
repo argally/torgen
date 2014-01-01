@@ -1,0 +1,12 @@
+set system host-name <%= host %>.<%= siloinfo[:silo] %>.wd
+set system services ssh root-login allow
+set system services ssh protocol-version v2
+set system root-authentication encrypted-password "XXXXXX"
+set interfaces ge-0/1/0 unit 0 family ethernet-switching port-mode trunk
+set interfaces ge-0/1/0 unit 0 family ethernet-switching vlan members all
+<% siloinfo[:vlans_oob].each do |key,value| -%><% if key.include?('oob') || key.include?('console') then -%>set interfaces vlan unit <%= value -%> family inet address <%= siloinfo[:prefix]%>1.<%= hostnames[host][:ipaddr] %>/20 
+set vlans <%= key %> l3-interface vlan.<%= value %>
+<% end -%>
+set vlans <%= key %> vlan-id <%= value -%>  
+<% end %> 
+delete interfaces me0 unit 0 family inet dhcp

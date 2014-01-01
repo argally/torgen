@@ -6,14 +6,14 @@ require 'csv'
 require 'rubygems'
 
 $tickers = { }
-root = {'hostnames' => $tickers}
+root = {:hostnames => $tickers}
 
 def parse_yaml(file)
   YAML::load(File.read(file))
 end
 
 def csv_convert(csvfile)
-  CSV.foreach($file, :headers => true, :header_converters => :downcase, :converters => :all) do |row|
+  CSV.foreach($file, :headers => true, :header_converters => :symbol, :converters => :all) do |row|
   $tickers[row.fields[0]] = Hash[row.headers[1..-1].zip(row.fields[1..-1])]
   end
 end
@@ -26,7 +26,7 @@ options = {}
 options[:template] = :tor
 
  optparse = OptionParser.new do |o|
-  o.on('-s', '--silo SILO', "E.g nprd.dub or eng.pdx") do |f|
+  o.on('-s', '--silo SILO', "E.g prod.dc1 or nprd.dc1") do |f|
     options[:silo] = f
   end
   o.on('-c', '--csv [CSV]', "CSV file conversion script for template generation") do |f|
@@ -72,7 +72,7 @@ if (options[:csv])
 else
  siloinfo = parse_yaml("../site/#{options[:silo]}.wd.yaml")
  switchinfo = parse_yaml(options[:file])
- hostnames = switchinfo['hostnames']
+ hostnames = switchinfo[:hostnames]
  template = ERB.new( File.read("../templates/#{options[:template]}.erb"), nil, '-')
   hostnames.each_key do |host|
    if File.exists?"../#{options[:silo]}" 

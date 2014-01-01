@@ -1,0 +1,364 @@
+system {
+    host-name <%= host %>.<%= siloinfo[:silo] %>; 
+    time-zone GMT; 
+    root-authentication {
+        encrypted-password "XXXXX"; ## SECRET-DATA
+    }
+    radius-server {
+        <%= siloinfo[:prefix]%>1.18 secret "YYYYYY"; ## SECRET-DATA
+    }
+    login {
+        message "****************************************************************************\n This computer system is for authorized users only. \n                        Mycorp,Inc\n****************************************************************************";
+
+        user super-users {
+            full-name "template user for radius";
+            uid 2054;
+            class super-user;
+        }
+   }
+
+    services {
+        ssh {
+            root-login allow;
+            protocol-version v2;
+        }
+    }
+    syslog {
+        user * {
+            any emergency;
+        }
+        <% if siloinfo[:silo] =~ /prod.dc2/ then %>
+        host <%= siloinfo[:prefix]%>3.12 {
+            any any;
+        }
+        host <%= siloinfo[:prefix]%>3.14 {
+            any any;
+        }
+        host <%= siloinfo[:prefix]%>3.22 {
+            any any;
+        }
+        <% else -%>
+        host <%= siloinfo[:prefix]%>1.12 {
+            any any;
+        }
+        host <%= siloinfo[:prefix]%>1.13 {
+            any any;
+        }
+        host <%= siloinfo[:prefix]%>1.22 {
+            any any;
+        }
+        <% end -%>
+        file messages {
+            any notice;
+            authorization info;
+        }
+        file interactive-commands {
+            interactive-commands any;
+        }                               
+    }
+ <% if hostnames[host][:vcp] =~ /vcp/ then -%>
+ commit synchronize; 
+<% end -%>
+     ntp {
+        server <%= siloinfo[:prefix]%>1.17 version 4 prefer;
+    }
+}
+chassis {
+   <% if hostnames[host][:vcp] =~ /vcp/ then -%>
+    redundancy {
+        graceful-switchover;
+    }
+<% end -%>  
+   aggregated-devices {
+        ethernet {
+            device-count 64;
+        }
+    }
+    lcd-menu {
+        fpc 0 {
+            menu-item {                 
+                maintenance-menu disable;
+            }                           
+        }                               
+    }                                   
+}
+interfaces {
+<%
+(0..47).each do |i|
+-%>
+     ge-0/0/<%= i %> {
+        unit 0 {
+    	     family ethernet-switching {	 
+                port-mode access;
+                vlan { <% siloinfo[:vlans].each do |key,value| -%><% if key.include?('admin') then %>
+                members <%= key %><% end %><% end %>;
+               } 
+	        }
+        }
+    }	
+<% end -%>
+<% if hostnames[host][:vcp] =~ /vcp/ then -%><%
+(0..47).each do |i|
+-%>
+     ge-1/0/<%= i %> {
+        unit 0 {
+    	     family ethernet-switching {	 
+                port-mode access;
+               vlan { <% siloinfo[:vlans].each do |key,value| -%><% if key.include?('admin') then %>
+                members <%= key %><% end %><% end %>;
+               } 
+            }
+        }
+    }
+<% end -%>
+    xe-1/1/2 {
+    disable; 
+     unit 0 {
+            family ethernet-switching {
+                port-mode trunk;
+                vlan {
+                    members [ all ];
+                }
+            }
+        }
+    }
+<% else -%>
+    xe-0/1/2 {
+    disable; 
+      unit 0 {
+            family ethernet-switching {
+                port-mode trunk;
+                vlan {
+                    members [ all ];
+                }
+            }
+        }
+    }
+<% end -%>  
+   xe-0/1/0 {
+    disable; 
+      unit 0 {
+            family ethernet-switching {
+                port-mode trunk;
+                vlan {
+                    members [ all ];
+                }
+            }
+        }
+    }
+    vlan {
+	<% siloinfo[:vlans].each do |key,value| -%> <% if key.include?('admin') || key.include?('inb') then -%> unit <%= value -%> { <% end -%> <% end %>
+        family inet {
+        <% if siloinfo[:silo] =~ /prod.dc2/ then %>
+              address <%= siloinfo[:prefix]%>4.<%= hostnames[host][:ipaddr] %>/22;
+        <% else -%>
+              address <%= siloinfo[:prefix]%>1.<%= hostnames[host][:ipaddr] %>/22;
+        <% end -%>
+            }
+        }
+    } 
+   vme {
+        unit 0 {
+            family inet {
+                address <%= siloinfo[:prefix]%>29.<%= hostnames[host][:ipaddr] %>/20;
+            }
+        }
+    }
+}
+snmp {
+    description <%= host %>.<%= siloinfo[:silo] %>.wd;
+    location "";
+    contact "Mycorp Infrastructre  - <infrastructure@mycorp.com>";
+    v3 {
+        usm {
+            local-engine {
+          }
+	}
+        vacm {
+            security-to-group {
+                security-model usm {
+                    security-name snmp {
+                        group snmp_gr;
+                    }
+                }
+            }
+            access {
+                group snmp_gr {
+                    default-context-prefix {
+                        security-model any {
+                            security-level privacy {
+                                read-view nagios-info;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    view nagios-info {
+        oid 1.3.6.* include;
+    }
+   trap-options {
+   <% if siloinfo[:silo] =~ /prod.dc2/ then %>
+        source-address <%= siloinfo[:prefix]%>4.<%= hostnames[host][:ipaddr] %>;
+   <% else %>
+        source-address <%= siloinfo[:prefix]%>1.<%= hostnames[host][:ipaddr] %>;
+   <% end %>
+    }
+    trap-group mycorp {
+        categories {
+            authentication;
+            chassis;
+            link;
+            remote-operations;
+            routing;
+            startup;
+            rmon-alarm;
+            vrrp-events;
+            configuration;
+        }
+        <% if siloinfo[:silo] =~ /prod.dc2/ then %>
+        targets {
+            <%= siloinfo[:prefix]%>3.13;
+            <%= siloinfo[:prefix]%>3.15;
+        }
+        <% else %>
+        targets {
+            <%= siloinfo[:prefix]%>1.16;
+            <%= siloinfo[:prefix]%>1.17;
+        }
+        <% end %>
+    }
+}
+routing-options {
+    <% if siloinfo[:silo] =~ /prod.dc2/ then %>
+    static {
+        route 0.0.0.0/0 next-hop <%= siloinfo[:prefix]%>4.1;
+    }
+ <% else %>
+   static {
+        route 0.0.0.0/0 next-hop <%= siloinfo[:prefix]%>1.1;
+    }
+ <% end %>
+}
+protocols {
+    igmp-snooping {
+        vlan all;
+    }
+ <% if siloinfo[:silo] =~ /prod.dc2/ then %>
+    rstp {
+       interface all {
+            edge;
+        }
+        interface xe-0/1/0.0 {
+            disable;
+        }
+<% if hostnames[host][:vcp] =~ /vcp/ then -%>
+        interface xe-1/1/2.0 {
+           disable;
+        }
+<% else -%>
+        interface xe-0/1/2.0 {
+            disable;
+        }
+<% end -%>              
+        bpdu-block-on-edge;             
+    }
+ <% else %>
+    mstp {
+        configuration-name <%= siloinfo[:silo_name] %>;
+        traceoptions {
+            file stp-log files 5 world-readable;
+            flag topology-change-state-machine;
+            flag all-failures;
+            flag events;
+        }
+        bridge-priority 24k;
+        interface xe-0/1/0.0 {
+            mode point-to-point;
+        }
+<% if hostnames[host][:vcp] =~ /vcp/ then -%>
+        interface xe-1/1/2.0 {
+            mode point-to-point;
+        }
+<% else -%>
+        interface xe-0/1/2.0 {
+            mode point-to-point;
+        }
+<% end -%>
+        msti 1 {                        
+            bridge-priority 24k;        
+            vlan [ <%= siloinfo[:stpstart] %>-<%=siloinfo[:stpfin] %>];
+        }                               
+        bpdu-block-on-edge;             
+    }  
+<% end %>                                  
+    lldp {                              
+        interface all;                  
+    }                                   
+    lldp-med {                          
+        interface all;
+    }
+}
+ethernet-switching-options {
+    /* Uplink Ports are DHCP trusted */
+    secure-access-port {
+        interface xe-0/1/0.0 {
+            dhcp-trusted;
+        }
+<% if hostnames[host][:vcp] =~ /vcp/ then -%>
+        interface xe-1/1/2.0 {
+            dhcp-trusted;
+        }
+<% else -%>
+        interface xe-0/1/2.0 {
+            dhcp-trusted;
+        }
+<% end -%>
+        interface all {
+            mac-limit 4 action drop;
+            no-dhcp-trusted;
+        }
+    }                                   
+    /* 5G/50% of uplink BUM traffic,800M/80% of access BUM traffic allowed */
+    storm-control {
+        interface xe-0/1/0.0 {
+            bandwidth 5000000;
+        }
+<% if hostnames[host][:vcp] =~ /vcp/ then -%>
+        interface xe-1/1/2.0 {
+            bandwidth 5000000;
+        }
+<% else -%>
+        interface xe-0/1/2.0 {
+            bandwidth 5000000;
+        }
+<% end -%>
+        interface all;
+    }
+}
+
+vlans {
+<% siloinfo[:vlans].each do |key,value| -%>
+   <%= key %> {
+      vlan-id <%= value -%>;
+     <% if key.include?('admin') || key.include?('inb') then -%> 
+	l3-interface vlan.<%= value -%>;
+    <% end -%>
+    }
+<% end -%>
+}
+<% if hostnames[host][:vcp] =~ /vcp/ then -%>
+virtual-chassis {
+    preprovisioned;
+    no-split-detection;
+    member 0 {
+        role routing-engine;
+        serial-number <%= hostnames[host][:vcp0] %>;
+    }
+    member 1 {
+        role routing-engine;
+        serial-number <%= hostnames[host][:vcp1] %>;
+    }
+}
+<% end -%>

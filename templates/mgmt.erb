@@ -1,0 +1,229 @@
+system {
+    host-name <%= host %>.<%= siloinfo[:silo] %>; 
+    time-zone GMT; 
+    root-authentication {
+        encrypted-password "XXXXXX"; ## SECRET-DATA
+    } 
+    radius-server {
+        <%= siloinfo[:prefix]%>1.18 secret "YYYYY"; ## SECRET-DATA
+    }
+    login {
+        message "****************************************************************************\n This computer system is for authorized users only. \n                        Mycorp,Inc\n****************************************************************************";
+          user super-users {
+            full-name "template user for radius";
+            uid 2001;
+            class super-user;
+        }
+    }   
+   services {
+        ssh {
+            root-login allow;
+            protocol-version v2;
+        }
+    }
+    syslog {
+        user * {
+            any emergency;
+        }
+        <% if siloinfo[:silo] =~ /prod.dc2/ then %>
+        host <%= siloinfo[:prefix]%>3.12 {
+            any any;
+        }
+        host <%= siloinfo[:prefix]%>3.14 {
+            any any;
+        }
+        host <%= siloinfo[:prefix]%>10.22 {
+            any any;
+        }
+        host <%= siloinfo[:prefix]%>3.22 {
+            any any;
+        } 
+        <% else -%>
+        host <%= siloinfo[:prefix]%>1.12 {
+            any any;
+        }
+        host <%= siloinfo[:prefix]%>1.22 {
+            any any;
+        }
+        <% end -%>
+        file messages {
+            any notice;
+            authorization info;
+        }
+        file interactive-commands {
+            interactive-commands any;
+        }                               
+    }
+    ntp {
+        server <%= siloinfo[:prefix]%>1.18 version 4 prefer;
+    }
+}
+chassis {
+    lcd-menu {
+        fpc 0 {
+            menu-item {                 
+                maintenance-menu disable;
+            }                           
+        }                               
+    }                                   
+}
+interfaces {
+<%
+(0..47).each do |i|
+-%>
+     ge-0/0/<%= i %> {
+        unit 0 {
+    	     family ethernet-switching {	 
+                port-mode access;
+                vlan { <% siloinfo[:vlans_oob].each do |key,value| -%><% if key.include?('oob') || key.include?('console') then %>
+                members <%= key %><% end %><% end %>;
+                }
+            }
+        }
+    }	
+<% end -%>
+    ge-0/1/0 {
+        unit 0 {
+            family ethernet-switching {
+                port-mode trunk;
+                vlan {
+                    members [ all ];
+                }
+            }
+        }
+    } 
+    ge-0/1/1 {
+        unit 0 {
+            family ethernet-switching; 
+        }
+    }
+    vlan {
+	<% siloinfo[:vlans_oob].each do |key,value| -%> <% if key.include?('oob') || key.include?('console') then -%> unit <%= value -%> { <% end -%> <% end %>
+        family inet {
+              address <%= siloinfo[:prefix]%>29.<%= hostnames[host][:ipaddr] %>/20;
+            }
+        }
+    } 
+<% if siloinfo[:silo] =~ /prod.dc2/ then %>
+    me0 {
+        unit 0 {
+            family inet {
+                address <%= siloinfo[:prefix]%>4.<%= hostnames[host][:ipaddr] %>/22;
+            }
+        }
+    }
+}
+<% else -%>
+   me0 {
+        unit 0 {
+            family inet {
+                address <%= siloinfo[:prefix]%>1.<%= hostnames[host][:ipaddr] %>/22;
+            }
+        }
+  <% end -%>
+snmp {
+    description <%= host %>.<%= siloinfo[:silo] %>;
+    location "";
+    contact "Mycorp Infrastructre  - <infrastructure@mycorp.com>";
+    v3 {
+        usm {
+            local-engine {
+          }
+	}
+        vacm {
+            security-to-group {
+                security-model usm {
+                    security-name snmpuser {
+                        group snmp_gr;
+                    }
+                }
+            }
+            access {
+                group snmp_gr {
+                    default-context-prefix {
+                        security-model any {
+                            security-level privacy {
+                                read-view snmp-info;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    view nagios-info {
+        oid 1.3.6.* include;
+    }
+    trap-group mycorp {
+        categories {
+            authentication;
+            chassis;
+            link;
+            remote-operations;
+            routing;
+            startup;
+            rmon-alarm;
+            vrrp-events;
+            configuration;
+        }
+        <% if siloinfo[:silo] =~ /prod.dc2/ then %>
+        targets {
+            <%= siloinfo[:prefix]%>3.13;
+            <%= siloinfo[:prefix]%>3.15;
+        }
+        <% else %>
+        targets {
+            <%= siloinfo[:prefix]%>1.16;
+            <%= siloinfo[:prefix]%>1.17;
+        }
+        <% end %>
+    }
+}
+routing-options {
+ <% if siloinfo[:silo] =~ /prod.dc2/ then %>
+    static {
+        route 0.0.0.0/0 next-hop <%= siloinfo[:prefix]%>4.1;
+    }
+ <% else %>
+   static {
+        route 0.0.0.0/0 next-hop <%= siloinfo[:prefix]%>1.1;
+    }
+ <% end %>
+}
+protocols {
+    igmp-snooping {
+        vlan all;
+    }
+    rstp {
+        bridge-priority 32k;
+<%
+(0..47).each do |i|
+-%>
+ 
+	interface ge-0/0/<%= i %>.0 {
+            edge; 
+        }
+<% end -%>        
+	interface ge-0/1/0.0 {
+            mode point-to-point;
+        }
+        bpdu-block-on-edge;             
+    }                                   
+    lldp {                              
+        interface all;                  
+    }                                   
+    lldp-med {                          
+        interface all;
+    }
+}
+
+vlans {
+<% siloinfo[:vlans_oob].each do |key,value| -%>
+<%= key %> {
+      vlan-id <%= value %>;
+     <% if key.include?('oob') || key.include?('console') then -%> 
+	l3-interface vlan.<%= value %>;
+    <% end -%>
+   }
+<% end -%>
+}
