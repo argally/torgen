@@ -3,7 +3,7 @@ Additional template for management switch included also.
 
 Usage 
 
-
+'''
 :~/code/torgen/bin$ ruby torgen.rb 
 Missing options: silo
 Usage: torgen [options]
@@ -12,7 +12,7 @@ Usage: torgen [options]
     -f, --file FILE                  YAML file containing SW devices to template
     -t, --template [TEMPLATE]        Template type using set or hierarcy Junos wnaset (tor, tor_set, mgmt_set, mgmt, vlan, generic) Default: tor
     -h, --help
-
+'''
 
 To convert specially formatted CSV file ../csv/SWADD.csv containing details on TOR switches into YAML data file for ingestion by templating engine for silo/site = prod.dc1  (Note silo is a mandatory switch) 
 
