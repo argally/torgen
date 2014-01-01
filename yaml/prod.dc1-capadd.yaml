@@ -1,17 +1,17 @@
 ---
 :hostnames:
   asw011:
-    :vcp0: BP0212446148
-    :vcp1: BP0213024113
+    :vcp0: BP6612446148
+    :vcp1: BP6613024113
     :ipaddr: 10
     :vcp: vcp
   asw012:
-    :vcp0: BP0213024084
-    :vcp1: BP0212446321
+    :vcp0: BP6613024084
+    :vcp1: BP6612446321
     :ipaddr: 11
     :vcp: vcp
   asw021:
-    :vcp0: BP0212446379
-    :vcp1: BP0213024920
+    :vcp0: BP6612446379
+    :vcp1: BP6613024920
     :ipaddr: 12
     :vcp: vcp
