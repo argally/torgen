@@ -70,7 +70,7 @@ if (options[:csv])
  f.puts root.to_yaml
  f.close
 else
- siloinfo = parse_yaml("../site/#{options[:silo]}.wd.yaml")
+ siloinfo = parse_yaml("../site/#{options[:silo]}.yaml")
  switchinfo = parse_yaml(options[:file])
  hostnames = switchinfo[:hostnames]
  template = ERB.new( File.read("../templates/#{options[:template]}.erb"), nil, '-')
